@@ -1,9 +1,14 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db";
-import { users } from "../db/schema";
+import { users, sessions } from "../db/schema";
 
 export interface RegisterUserDto {
   name: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginUserDto {
   email: string;
   password: string;
 }
@@ -34,4 +39,37 @@ export async function registerUserService(dto: RegisterUserDto) {
   });
 
   return { data: "OK" };
+}
+
+export async function loginUserService(dto: LoginUserDto) {
+  // Find user by email
+  const userList = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, dto.email))
+    .limit(1);
+
+  if (userList.length === 0) {
+    throw new Error("Email atau password salah");
+  }
+
+  const user = userList[0];
+
+  // Verify password using Bun's native password verify
+  const isPasswordValid = await Bun.password.verify(dto.password, user.password);
+
+  if (!isPasswordValid) {
+    throw new Error("Email atau password salah");
+  }
+
+  // Generate UUID token
+  const token = crypto.randomUUID();
+
+  // Save session to database
+  await db.insert(sessions).values({
+    token: token,
+    userId: user.id,
+  });
+
+  return { data: token };
 }
