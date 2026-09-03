@@ -49,11 +49,10 @@ export async function loginUserService(dto: LoginUserDto) {
     .where(eq(users.email, dto.email))
     .limit(1);
 
-  if (userList.length === 0) {
+  const user = userList[0];
+  if (!user) {
     throw new Error("Email atau password salah");
   }
-
-  const user = userList[0];
 
   // Verify password using Bun's native password verify
   const isPasswordValid = await Bun.password.verify(dto.password, user.password);
@@ -73,3 +72,38 @@ export async function loginUserService(dto: LoginUserDto) {
 
   return { data: token };
 }
+
+export async function getCurrentUserService(token: string) {
+  const sessionList = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.token, token))
+    .limit(1);
+
+  const session = sessionList[0];
+  if (!session) {
+    throw new Error("Unauthorize");
+  }
+
+  const userList = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, session.userId))
+    .limit(1);
+
+  const user = userList[0];
+  if (!user) {
+    throw new Error("Unauthorize");
+  }
+
+  return {
+    data: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      created_at: user.createdAt,
+    },
+  };
+}
+
+
